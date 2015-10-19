@@ -9,5 +9,5 @@
 - 대개 WAS(Web Application Server)는 DB서버와 연결되므로 WAS가 해킹을 당하면 DB서버도 위험할 수 있음.  따라서 Reverse proxy를 두고 WAS를 내부망에 위치시켜 Reverse proxy 서버만이 내부에 있는 WAS와 통신해서 결과를 받아올 수 있는 구조.
 
 ----
-![forward_and_reverse_proxies](http://community.brocade.com/legacyfs/online/1914_fwdrevproxy.png)
+![forward_and_reverse_proxies](http://community.brocade.com/legacyfs/online/1914_fwdrevproxy.png)  
 (이미지 출처: [Using Stingray Traffic Manager as a Forward Proxy](http://community.brocade.com/t5/vADC-Docs/Using-Stingray-Traffic-Manager-as-a-Forward-Proxy/ta-p/73721))
