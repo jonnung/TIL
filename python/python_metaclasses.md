@@ -24,10 +24,10 @@
 `type`으로 메소드나 속성을 정의하기 위해 `dict`를 인자로 전달한다. 상속을 위해서는 `bases` 인자로 클래스를 전달한다.
 
     class Foo:
-    		pass
+        pass
     
     def greeting(self):
-    		return self.bar
+        return self.bar
     
     FooChild = type('FooChild', (Foo,), {'bar': 'hello', 'greeting': greeting})
     
@@ -74,7 +74,7 @@ Python의 모든 것은 객체다. 그리고 이 모든 것들은 클래스로�
 클래스에 `__metaclass__`  속성을 설정하면, 해당 클래스를 생성하기 위해 이 메타클래스를 직적 사용하게 된다. 그리고 `__metaclass__` 에는 클래스는 만드는 '무언가'를 정의하게 된다.
 
     class Foo:
-    		__mataclass__ = something...
+        __mataclass__ = something...
 
 Python은 클래스 정의에 `__metaclass__` 가 있는지 찾고, 있는 경우 그 클래스를 만들기 위해 해당 메타클래스를 사용한다. 발견하지 못한 경우 `type`을 사용한다. 그리고 `__metaclass__` 속성은 상속되지 않는다. 
 
