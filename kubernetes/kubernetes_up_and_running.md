@@ -12,7 +12,7 @@ Tags: kubernetes
 - [x]  3장. 쿠버네티스 클러스터 배포
 - [x]  4장. 일반적인 `kubectl` 명령
 - [x]  5장. 포드
-- [ ]  6장. 라벨과 애노테이션
+- [x]  6장. 라벨과 애노테이션
 - [ ]  7장. 서비스 탐색
 - [ ]  8장. 레플리카세트
 - [ ]  9장. 데몬세트
@@ -482,3 +482,136 @@ exec 프로브는 스크립트나 프로그램을 실행해서 0을 반환하면
 **호스트 파일 시스템 마운트**
 
 `hostDir` 볼륨을 이용해 워커 노드에 있는 임시 위치를 컨테이너로 마운트 할 수 있다.
+
+---
+
+# 6장. 라벨과 애노테이션
+
+라벨(label)은 포드(pod)와 레플리카세트(replicaset) 같은 쿠버네티스 객체에 첨부할 수 있도록 키(key)/값(value) 쌍으로 구성된다. 라벨은 임의적이며 쿠버네티스 객체에 식별 정보를 제공하고, 객체를 그룹화 하는 기초가 된다.
+
+애노테이션(annotation)은 라벨과 유사하다. 도구와 라이브러리에서 활용할 수 있게 식별 불가능한 정보를 저장하기 위해 설계된 키/값 쌍의 구조다.
+
+## ▶︎ 라벨
+
+라벨의 키는 선택적 접두사와 슬래시(/)로 구분한다. 접두사를 지정하는 경우 253자로 된 DNS 하위 도메인으로 구성해야 하며, 필수적인 키 이름은 63자보다 짧아야 한다. 키 이름은 영문자로 시작하고, 문자 사이에 대시(-), 밑줄(_), 점(.)을 사용할 수 있다. 라벨의 값은 최대 63자인 문자열이다.
+
+[예시](https://www.notion.so/7b6ba742e1694ea4976c800568f2488b)
+
+### 라벨 적용 예제
+
+    $ kubectl run alpaca-prod \
+      --image=gcr.io/kuar-demo/kuard-amd64:1 \
+      --replicas=2 \
+      --labels="ver=1,app=alpaca,env=prod"
+    
+    $ kubectl run alpaca-test \
+      --image=gcr.io/kuar-demo/kuard-amd64:2 \
+      --replicas=1 \
+      --labels="ver=2,app=alpaca,env=test"
+
+    $ kubectl run bandicoot-prod \
+      --image=gcr.io/kuar-demo/kuard-amd64:2 \
+      --replicas=2 \
+      --labels="ver=2,app=bandicoot,env=prod"
+    
+    $ kubectl run bandicoot-staging \
+      --image=gcr.io/kuar-demo/kuard-amd64:2 \
+      --replicas=1 \
+      --labels="ver=2,app=bandicoot,env=staging"
+
+**Deployment 라벨 확인**
+
+    $ kubectl get deploy --show-labels
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE   LABELS
+    alpaca-prod         2/2     2            2           72s   app=alpaca,env=prod,ver=1
+    alpaca-test         1/1     1            1           58s   app=alpaca,env=test,ver=2
+    bandicoot-prod      2/2     2            2           48s   app=bandicoot,env=prod,ver=2
+    bandicoot-staging   1/1     1            1           26s   app=bandicoot,env=staging,ver=2
+
+**Deployment 라벨 수정**
+
+ `kubectl label` 명령어는 deployment 라벨만 변경한다.
+
+    $ kubectl label deploy alpaca-test "canary=true"
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE     LABELS
+    alpaca-prod         2/2     2            2           2m48s   app=alpaca,env=prod,ver=1
+    alpaca-test         1/1     1            1           2m34s   app=alpaca,canary=true,env=test,ver=2
+    bandicoot-prod      2/2     2            2           2m24s   app=bandicoot,env=prod,ver=2
+    bandicoot-staging   1/1     1            1           2m2s    app=bandicoot,env=staging,ver=2
+
+**라벨을 열(컬럼)으로 표시하기**
+
+    $ kubectl get deploy -L canary
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE     CANARY
+    alpaca-prod         2/2     2            2           4m14s
+    alpaca-test         1/1     1            1           4m      true
+    bandicoot-prod      2/2     2            2           3m50s
+    bandicoot-staging   1/1     1            1           3m28s
+
+**라벨 제거 (접미어에 대시(-) 추가)**
+
+    $ kubectl label deploy alpaca-test "canary-"
+
+## ▶︎ 라벨 선택기 (selector)
+
+라벨의 집합을 기반으로 쿠버네티스 객체를 필터링. 간단한 boolean을 사용한다. 라벨 선택기는 kubectl 같은 도구를 사용하는 최종 사용자나 다른 유형의 쿠버네티스 객체에 의해 사용된다.
+
+**라벨 직접 지정(복수개)**
+
+    $ kubectl get deploy --selector="ver=2" --show-labels
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE   LABELS
+    alpaca-test         1/1     1            1           12m   app=alpaca,env=test,ver=2
+    bandicoot-prod      2/2     2            2           12m   app=bandicoot,env=prod,ver=2
+    bandicoot-staging   1/1     1            1           12m   app=bandicoot,env=staging,ver=2
+    
+    
+    $ kubectl get deploy --selector="app=bandicoot,ver=2" --show-labels
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE   LABELS
+    bandicoot-prod      2/2     2            2           12m   app=bandicoot,env=prod,ver=2
+    bandicoot-staging   1/1     1            1           12m   app=bandicoot,env=staging,ver=2
+
+**라벨 OR 조건으로 지정**
+
+    $ kubectl get deploy --selector="app in (alpaca, bandicoot)" --show-labels
+    
+    NAME                READY   UP-TO-DATE   AVAILABLE   AGE   LABELS
+    alpaca-prod         2/2     2            2           14m   app=alpaca,env=prod,ver=1
+    alpaca-test         1/1     1            1           14m   app=alpaca,env=test,ver=2
+    bandicoot-prod      2/2     2            2           14m   app=bandicoot,env=prod,ver=2
+    bandicoot-staging   1/1     1            1           14m   app=bandicoot,env=staging,ver=2
+
+[선택기에 사용할 수 있는 연산자](https://www.notion.so/5857d1e342fe4794a7e92044fdaa0dab)
+
+## ▶︎ API 객체의 라벨 선택기
+
+역사적인 이유로 쿠버네티스는 두가지 버전의 API 호환성을 제공한다. 
+
+`app-alpaca, ver in (1, 2)`의 선택기는 다음과 같이 변환된다.
+
+    selector:
+      matchLabels:
+        app: alpaca
+    matchExpresstions:
+      - {key: ver, operator: In, values: [1, 2]}
+
+모두 AND 연산자로 평가된다. != 연산자를 나타내는 유일한 방법은 단일 값을 사용한 `NotIn` 형식이다.
+
+## ▶︎ 애노테이션
+
+**도구와 라이브러리를 지원하려는 목적**으로 쿠버네티스 객체에 추가적인 메타데이터를 저장하는 장소를 제공한다.
+
+라벨을 사용해 객체를 식별하고 그룹화하는 동안 애노테이션은 객체의 출처, 객체의 사용 방법 또는 객체에 대한 추가 정보를 제공하는 데 사용한다.
+
+애노테이션과 라벨은 일부 기능이 겹친다. 확실하지 않은 경우 객체 애노테이션으로 정보를 추가하고, 선택기에서 사용하려는 경우 애노테이션을 라벨로 만들어 사용한다.
+
+애노테이션은 쿠버네티스 여러 곳에서 사용되고 있으며, 롤링 배포(rolling deployment)에 주로 사용한다.  **롤링 배포 동안 애노테이션은 롤 아웃 상태를 추적하고, 디플로이먼트 이전 상태로 롤백하는데 필요한 정보를 제공한다.**
+
+애노티에션 키는 라벨 키와 동일한 형식을 사용한다. 그러나 도구 간 정보 교환에 자주 사용되기 때문에 **키의 네임스페이스 부분**이 더 중요하다.
+(예: `deployment.kubenetes.io/revision`, `kubenetes.io/change-cause` )
+
+애노테이션 값은 자유로운 문자열 필드로 구성될 수 있지만, 유효성 검사가 수행되지 않기 때문에 유의해야 한다. (예: JSON을 문자열로 인코딩해서 저장하는 경우)
