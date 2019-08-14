@@ -13,7 +13,7 @@ Tags: kubernetes
 - [x]  4장. 일반적인 `kubectl` 명령
 - [x]  5장. 포드
 - [x]  6장. 라벨과 애노테이션
-- [ ]  7장. 서비스 탐색
+- [x]  7장. 서비스 탐색
 - [ ]  8장. 레플리카세트
 - [ ]  9장. 데몬세트
 - [ ]  10장. 잡
@@ -615,3 +615,98 @@ exec 프로브는 스크립트나 프로그램을 실행해서 0을 반환하면
 (예: `deployment.kubenetes.io/revision`, `kubenetes.io/change-cause` )
 
 애노테이션 값은 자유로운 문자열 필드로 구성될 수 있지만, 유효성 검사가 수행되지 않기 때문에 유의해야 한다. (예: JSON을 문자열로 인코딩해서 저장하는 경우)
+
+---
+
+# 7장. 서비스 탐색
+
+    kubectl run alpaca-prod \
+      --image=gcr.io/kuar-demo/kuard-amd64:1 \
+      --replicas=2 \
+      --port=8080 \
+      --labels="ver=1,app=alpaca,env=prod"
+
+## 서비스 객체
+
+쿠버네티스에서 실제 서비스 검색은 서비스(Service) 객체로부터 시작된다. 
+
+kubectl expose를 사용해서 서비스를 생성할 수 있다. 이 명령어는 디플로이먼트 정의로부터 라벨 선택기와 관련 포트를 편리하게 가져온다.
+
+    $ kuebectl expose deployment alpaca-prod
+
+또 서비스에는 클러스터 IP(cluster IP)라는 새로운 유형의 가상 IP가 할당된다. 이것은 시스템이 선택기로 식별되는 모든 포드에 로드밸런싱을 수행할 특별한 목적의 IP 주소다.
+
+### 서비스 DNS
+
+쿠버네티스는 클러스터에서 실행 중인 포드에 DNS 서비스를 제공한다. 처음 클러스터를 생성할 때 시스템 구성요소로 설치된다. 쿠버네티스 DNS 서비스는 클러스터 IP의 DNS이름을 제공한다.
+
+DNS 이름이 `alpaca-prod.default.svc.cluster.local.` 일 때 
+
+- alpaca-prod: 질의에 포함된 서비스 이름
+- default: 해당 서비스가 포함된 네임스페이스
+- svc.cluster.local:(svc는 서비스라는 것을 인지) 클러스터의 기본 도메인 이름. 기본값. 관리자는 이를 변경해 여러 클러스터에서 고유한 DNS 이름을 사용할 수 있다.
+
+### 준비 상태 검사
+
+준비 상태(readiness)를 확인해 어떤 포드가 준비가 되었는지 추적하는 기능을 갖고 있다.
+
+    ...
+    spec:
+          containers:
+          - image: gcr.io/kuar-demo/kuard-amd64:1
+            imagePullPolicy: IfNotPresent
+            name: alpaca-prod
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            readinessProbe:
+              httpGet:
+                path: /ready
+                port: 8080
+              periodSeconds: 2
+              initalDelaySeconds: 0
+              failureThreshold: 3
+              successThreshold: 1
+
+이 검사는 포드가 구동된 이후 2초마다 실행되고, 3회 연속 실패 시 포드가 준비되지 않은 것으로 간주한다. 그리고 한번만 검사가 성공적으로 수행되면, 다시 준비 상태가 된다.
+
+    $ kubectl get endpoints alpaca-prod --watch
+
+엔드 포인트는 서비스에서 트래픽을 전송하는 대상을 찾기 위한 하위 수준의 방법이다. 
+
+## 클러스터 외부로의 서비스
+
+가장 적용하기 쉬운 방법은 **NodePort** 기능을 사용하는 것이다.
+
+시스템이 서비스 포트를 선택하거나 사람이 직접 포트를 지정해 클러스터의 모든 노드에 대해 서비스하도록 설정할 수 있다.
+
+`spec.type` 필드를 NodePort 로 변경하고 아래 명령어를 통해 변경된 Type을 확인할 수 있다.
+
+    $ kubectl describe service alpaca-prod
+    
+    Name:                     alpaca-prod
+    Namespace:                default
+    Labels:                   app=alpaca
+                              env=prod
+                              ver=1
+    Annotations:              <none>
+    Selector:                 app=alpaca,env=prod,ver=1
+    Type:                     NodePort
+    IP:                       10.110.239.48
+    LoadBalancer Ingress:     localhost
+    Port:                     <unset>  8080/TCP
+    TargetPort:               8080/TCP
+    NodePort:                 <unset>  30684/TCP
+    Endpoints:                10.1.0.24:8080,10.1.0.25:8080
+    Session Affinity:         None
+    External Traffic Policy:  Cluster
+    Events:                   <none>
+
+이제 브라우저에서 [http://localhost:8080](http://localhost:8080) 으로 접속해 해당 서비스에 연결할 수 있다.
+
+## 고급 세부 정보
+
+### kube-proxy와 클러스터 IP
+
+클러스터 IP는 서비스의 모든 엔드포인트에 트래픽을 로드밸런싱 하는 안정적인 가상 IP이다. 이러한 기술은 모든 노드에서 실행되는 **kube-proxy**에 의해 수행된다.
+[https://qph.fs.quoracdn.net/main-qimg-ab7ae36a7d7020a30b3447e2ffa62b4e.webp](https://qph.fs.quoracdn.net/main-qimg-ab7ae36a7d7020a30b3447e2ffa62b4e.webp)
